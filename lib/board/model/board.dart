@@ -1,122 +1,116 @@
-import 'package:flutter/foundation.dart';
-
 class Board {
-  List<List<BoardItem>> board = List.generate(
-      9, (_) => List.generate(9, (index) => BoardItem(), growable: false),
-      growable: false);
-
-  List<List<BoardItem>> columns =
+  final List<BoardTile> _board =
+      List.generate(81, (_) => BoardTile(), growable: false);
+  final List<List<BoardTile>> _rows =
       List.generate(9, (index) => [], growable: false);
-  List<List<BoardItem>> boxes =
+  final List<List<BoardTile>> _columns =
+      List.generate(9, (index) => [], growable: false);
+  final List<List<BoardTile>> _boxes =
       List.generate(9, (index) => [], growable: false);
 
   Board({List<List<int>>? input}) {
-    if (input != null) {
-      board = input
-          .map((e) => List.generate(9, (i) => BoardItem(num: e[i])))
-          .toList();
-    }
-    initColBox();
-    return;
-  }
-
-  void initColBox() {
-    for (int i = 0; i < 9; i++) {
-      for (int j = 0; j < 9; j++) {
-        columns[i].add(board[j][i]);
-        boxes[_boxIndex(j, i)].add(board[i][j]);
+    _initGroupTiles();
+    int index = 0;
+    for (List<int> row in input!) {
+      for (int num in row) {
+        _board[index].set(num);
+        index++;
       }
     }
   }
 
-  int _boxIndex(int col, int row) {
-    int colIndex() {
-      if (col < 3) {
-        return 0;
-      } else if (col < 6) {
-        return 1;
-      } else {
-        return 2;
-      }
-    }
-
-    if (row < 3) {
-      return colIndex();
-    } else if (row < 6) {
-      return colIndex() + 3;
-    } else {
-      return colIndex() + 6;
-    }
-  }
-
+  /// Returns **`True`** if successfully solved the board and **`False`** if otherwise
   bool solveBoard() {
-    int loops = 0;
-    while (!isSolved()) {
-      loops++;
-      if (updateAllNotes()) return false;
+    bool traceBack(int index) {
+      // Check if its the end of the board
+      if (index == 81) return true;
+      // Check if the current index already has a value
+      BoardTile tile = _board[index];
+      if (tile.solved) {
+        return traceBack(index + 1);
+      }
+      // Update the notes of the current Index
+      Set<int> alreadyExists = {};
+      for (BoardTile item in [
+        ..._rows[tile.row],
+        ..._columns[tile.col],
+        ..._boxes[tile.box]
+      ]) {
+        alreadyExists.add(item.num);
+      }
+      // Try out the notes
+      for (int i in tile.notes.difference(alreadyExists)) {
+        tile.num = i;
+        if (traceBack(index + 1)) return true;
+        tile.num = 0;
+      }
+      // print("Cant Find at $index\nNotes: ${tile.notes}\nExist:$alreadyExists");
+      return false;
     }
-    if (kDebugMode) {
-      print("Solved after $loops iterations");
-    }
-    return true;
+
+    fillNotes();
+    return traceBack(0);
   }
 
-  bool updateAllNotes() {
-    bool updates = false;
-    for (int row = 0; row < 9; row++) {
-      for (int col = 0; col < 9; col++) {
-        if (_updateNote(col, row)) updates = true;
+  void _initGroupTiles() {
+    int rowIdx = 0;
+    int colIdx = 0;
+    int boxIdx = 0;
+    for (BoardTile tile in _board) {
+      if (colIdx == 9) {
+        rowIdx++;
+        colIdx = 0;
+      }
+      boxIdx = colIdx ~/ 3 + 3 * (rowIdx ~/ 3);
+      tile.row = rowIdx;
+      tile.col = colIdx;
+      tile.box = boxIdx;
+      _rows[rowIdx].add(tile);
+      _columns[colIdx].add(tile);
+      _boxes[boxIdx].add(tile);
+      colIdx++;
+    }
+  }
+
+  void fillNotes() {
+    for (List<BoardTile> list in [..._rows, ..._columns, ..._boxes]) {
+      Set alreadyExists = {};
+      for (BoardTile tile in list) {
+        if (!tile.solved) continue;
+        alreadyExists.add(tile.num);
+      }
+      for (BoardTile tile in list) {
+        if (tile.solved) continue;
+        tile.notes.removeAll(alreadyExists);
+        // tile.check();
       }
     }
-    return updates;
   }
 
-  bool _updateNote(int col, int row) {
-    if (board[row][col].num != 0) return false;
-    Set prev = board[row][col].notes;
-    Set toBeRemoved = {};
-    toBeRemoved.addAll(_checkCol(col));
-    toBeRemoved.addAll(_checkRow(row));
-    toBeRemoved.addAll(_checkBox(col, row));
-    board[row][col]
-      ..notes.removeAll(toBeRemoved)
-      ..check();
-    if (prev == board[row][col].notes) return false;
-    return true;
-  }
-
-  Set<int> _checkRow(int row) {
-    Set<int> used = {for (BoardItem item in board[row]) item.num};
-    return used;
-  }
-
-  Set<int> _checkCol(int col) {
-    Set<int> used = {for (BoardItem item in columns[col]) item.num};
-    return used;
-  }
-
-  Set<int> _checkBox(int col, int row) {
-    Set<int> used = {
-      for (BoardItem item in boxes[_boxIndex(col, row)]) item.num
-    };
-    return used;
-  }
-
-  bool isSolved() {
-    for (var row in board) {
-      for (var item in row) {
-        if (item.num == 0) return false;
+  @override
+  String toString() {
+    int index = 0;
+    String string = "";
+    for (BoardTile tile in _board) {
+      if (index == 9) {
+        index = 0;
+        string = "$string\n";
       }
+      string = "$string$tile  ";
+      index++;
     }
-    return true;
+    return string;
   }
 }
 
-class BoardItem {
+class BoardTile {
   Set<int> notes = {};
   int num;
+  int col = -1;
+  int row = -1;
+  int box = -1;
 
-  BoardItem({
+  BoardTile({
     this.num = 0,
   }) {
     if (num != 0) {
@@ -126,6 +120,8 @@ class BoardItem {
     notes = {1, 2, 3, 4, 5, 6, 7, 8, 9};
   }
 
+  bool get solved => (num != 0);
+
   bool check() {
     if (num != 0) return true;
 
@@ -134,6 +130,12 @@ class BoardItem {
       return true;
     }
     return false;
+  }
+
+  bool set(int input) {
+    if (num != 0) return false;
+    num = input;
+    return true;
   }
 
   @override
