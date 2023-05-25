@@ -9,7 +9,8 @@ class NavBarShell extends StatelessWidget {
 
   final List<String> _routes = [
     const HomeRoute().location,
-    const BoardRoute().location,
+    const LevelsRoute().location,
+    const SettingsRoute().location,
   ];
 
   int getCurrentIndex(BuildContext context) {
@@ -34,7 +35,11 @@ class NavBarShell extends StatelessWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.play_arrow),
-            label: 'Board',
+            label: 'Levels',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
           )
         ],
         currentIndex: selectedIndex,
